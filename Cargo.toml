@@ -1,0 +1,13 @@
+[package]
+name = "rhodium"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.3.19", features = ["derive"] }
+color-eyre = "0.6.2"
+lazy_static = "1.4.0"
+markdown = "1.0.0-alpha.11"
+ramhorns = "0.14.0"
+syntect = "5.0.0"
+thiserror = "1.0.44"
