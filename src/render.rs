@@ -19,6 +19,11 @@ pub enum RenderError {
     HeaderTooDeep,
     #[error("Rhodium doesn't currently support {node_type}.")]
     NodeNotSupported { node_type: &'static str },
+    #[error("Unable to parse markdown provided")]
+    ErrorParsing {
+        #[from]
+        source: MarkdownError,
+    },
     #[error("Internal Error: md ast nodes have been structured in an unexpected way.")]
     InternalError,
 }

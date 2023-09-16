@@ -1,29 +1,29 @@
 #![feature(if_let_guard)]
 #![feature(pattern)]
+#![feature(async_closure)]
 
 use std::path::PathBuf;
 
+use clap::Parser;
 use markdown::{mdast, to_mdast, ParseOptions};
-use ramhorns::{Content, Template};
-mod render;
-mod utils;
+use post::Post;
+use ramhorns::Template;
 use render::{mdast_into_str_builder, MarkdownError, Toc};
 
-use clap::Parser;
+mod development_server;
+mod post;
+mod render;
+mod utils;
+
 #[derive(Parser)]
 enum Args {
     Render {
         inp: std::path::PathBuf,
         template: std::path::PathBuf,
     },
-    Serve {},
-}
-
-#[derive(Content, Debug)]
-struct Post<'a> {
-    title: &'a str,
-    toc: Option<&'a str>,
-    content: &'a str,
+    Serve {
+        site_root: std::path::PathBuf,
+    },
 }
 
 fn render_md_to_writer<W>(
@@ -51,14 +51,15 @@ where
 
     let toc_html = toc.to_html();
     let post = Post {
-        title: &toc.name,
-        content: &content,
-        toc: toc_html.as_deref(),
+        title: toc.name,
+        content: content,
+        toc: toc_html
     };
     Ok(template.render_to_writer(writer, &post)?)
 }
 
-fn main() -> color_eyre::eyre::Result<()> {
+#[tokio::main]
+async fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
 
     match Args::parse() {
@@ -68,9 +69,9 @@ fn main() -> color_eyre::eyre::Result<()> {
         } => {
             let template = Template::new(std::fs::read_to_string(path)?)?;
             render_md_to_writer(md_file, &template, &mut std::io::stdout())?;
-        }
-        Args::Serve {} => {}
-    }
 
-    Ok(())
+            Ok(())
+        }
+        Args::Serve { site_root } => Ok(development_server::serve_forever(site_root).await?),
+    }
 }
