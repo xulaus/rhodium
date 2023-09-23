@@ -53,7 +53,7 @@ where
     let post = Post {
         title: toc.name,
         content,
-        toc: toc_html
+        toc: toc_html,
     };
     Ok(template.render_to_writer(writer, &post)?)
 }

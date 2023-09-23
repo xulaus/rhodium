@@ -6,23 +6,42 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
 use ramhorns::Template;
 
-use crate::post::Post;
+use crate::post::{ParseError, Post};
 
-fn render_page(state: &State, uri_path: &str)  -> Response<String>{
-    let template = std::fs::read_to_string(&state.page_template)
-        .map_err(|_| ())
-        .and_then(|tpl| Template::new(tpl).map_err(|_| ()));
+impl From<ParseError> for Response<String> {
+    fn from(value: ParseError) -> Self {
+        let status = if let ParseError::NotFound { .. } = value {
+            hyper::StatusCode::NOT_FOUND
+        } else {
+            hyper::StatusCode::INTERNAL_SERVER_ERROR
+        };
 
-    let template = if let Ok(template) = template {
-        template
-    } else {
-        return Response::builder()
-            .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!(
-                "Couldn't find page template {:?}",
-                &state.page_template
-            ))
+        Response::builder()
+            .status(status)
+            .body(format!("{:?}", value))
             .unwrap()
+    }
+}
+
+fn template_from_path(path: &PathBuf) -> Result<Template, ParseError> {
+    Ok(Template::new(std::fs::read_to_string(path)?)?)
+}
+
+fn render_template_to_string<C: Content>(
+    template: &Template,
+    content: &C,
+) -> Result<String, ParseError> {
+    let mut buf = Vec::<u8>::new();
+    match template.render_to_writer(&mut buf, &content) {
+        Ok(()) => String::from_utf8(buf).map_err(|_| ParseError::InternalError),
+        Err(err) => Err(err.into()),
+    }
+}
+
+fn render_page(state: &State, uri_path: &str) -> Response<String> {
+    let template = match template_from_path(&state.page_template) {
+        Ok(template) => template,
+        Err(err) => return err.into(),
     };
 
     let html: std::ffi::OsString = std::ffi::OsString::from("html");
@@ -37,36 +56,20 @@ fn render_page(state: &State, uri_path: &str)  -> Response<String>{
         md_file
     };
 
-    let md_string = if let Ok(md_string) = std::fs::read_to_string(&md_file) {
-        md_string
-    } else {
-        return Response::builder()
-        .status(hyper::StatusCode::NOT_FOUND)
-        .body(format!("Couldn't find {}", md_file.display()))
-        .unwrap()
-    };
-
-
-    let mut buf = Vec::<u8>::new();
-    if let Ok(post) = Post::from_md_string(&md_string) {
-        template.render_to_writer(&mut buf, &post).unwrap()
-    } else {
-        return Response::builder()
-        .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-        .body("".to_string())
-        .unwrap()
-    };
-
-    Response::builder()
-        .status(hyper::StatusCode::OK)
-        .body(String::from_utf8(buf).unwrap())
-        .unwrap()
+    Post::from_file(&md_file)
+        .and_then(|post| render_template_to_string(&template, &post))
+        .and_then(|page| {
+            Response::builder()
+                .status(hyper::StatusCode::OK)
+                .body(page)
+                .map_err(|_| ParseError::InternalError)
+        })
+        .unwrap_or_else(Into::into)
 }
 
 use ramhorns::Content;
 #[derive(Content, Debug)]
-pub struct PostMeta {
-}
+pub struct PostMeta {}
 #[derive(Content, Debug)]
 pub struct Pagenation {
     first_page: Option<String>,
@@ -79,26 +82,14 @@ pub struct Pagenation {
 #[derive(Content, Debug)]
 pub struct Index {
     pages: Vec<PostMeta>,
-    pagenation: Pagenation
+    pagenation: Pagenation,
 }
 
-fn render_index(state: &State, uri_path: &str)  -> Response<String>{
-    let template = std::fs::read_to_string(&state.index_template)
-        .map_err(|_| ())
-        .and_then(|tpl| Template::new(tpl).map_err(|_| ()));
-
-    let template = if let Ok(template) = template {
-        template
-    } else {
-        return Response::builder()
-            .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-            .body(format!(
-                "Couldn't find index template {:?}",
-                &state.index_template
-            ))
-            .unwrap()
+fn render_index(state: &State, uri_path: &str) -> Response<String> {
+    let template = match template_from_path(&state.index_template) {
+        Ok(template) => template,
+        Err(err) => return err.into(),
     };
-    let mut buf: Vec<u8> = Vec::<u8>::new();
 
     let pagenation = Pagenation {
         first_page: Some("index.html".to_owned()),
@@ -106,20 +97,21 @@ fn render_index(state: &State, uri_path: &str)  -> Response<String>{
         next_page: None,
         latest_page: Some("index.html".to_owned()),
         page: 1,
-        total_pages: 1
+        total_pages: 1,
     };
-    let content = Index{pages:vec![], pagenation};
-    match template.render_to_writer(&mut buf, &content) {
-        Err(err) => Response::builder()
-                .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-                .body(err.to_string())
-                .unwrap(),
-        Ok(()) =>
+    let content = Index {
+        pages: vec![],
+        pagenation,
+    };
+
+    render_template_to_string(&template, &content)
+        .and_then(|page| {
             Response::builder()
                 .status(hyper::StatusCode::OK)
-                .body(String::from_utf8(buf).unwrap())
-                .unwrap()
-    }
+                .body(page)
+                .map_err(|_| ParseError::InternalError)
+        })
+        .unwrap_or_else(Into::into)
 }
 
 async fn build_for_web<'a>(req: Request<Body>, state: &State) -> Response<String> {
@@ -152,7 +144,7 @@ pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper:
         std::sync::Arc::new(State {
             site_root,
             page_template,
-            index_template
+            index_template,
         })
     };
 
@@ -177,5 +169,5 @@ pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper:
 struct State {
     site_root: PathBuf,
     page_template: PathBuf,
-    index_template: PathBuf
+    index_template: PathBuf,
 }
