@@ -69,7 +69,12 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
 
 use ramhorns::Content;
 #[derive(Content, Debug)]
-pub struct PostMeta {}
+pub struct PostMeta {
+    permalink: String,
+    title: String,
+    published_date: String,
+    excerpt: String,
+}
 #[derive(Content, Debug)]
 pub struct Pagenation {
     first_page: Option<String>,
@@ -81,7 +86,7 @@ pub struct Pagenation {
 }
 #[derive(Content, Debug)]
 pub struct Index {
-    pages: Vec<PostMeta>,
+    posts: Vec<PostMeta>,
     pagenation: Pagenation,
 }
 
@@ -100,7 +105,26 @@ fn render_index(state: &State, uri_path: &str) -> Response<String> {
         total_pages: 1,
     };
     let content = Index {
-        pages: vec![],
+        posts: Vec::from([
+            PostMeta {
+                title: "Post 1".to_string(),
+                excerpt: "asdas".to_string(),
+                permalink: "posts/".to_string(),
+                published_date: "2023-07-20".to_string(),
+            },
+            PostMeta {
+                title: "Post 2".to_string(),
+                excerpt: "asdas".to_string(),
+                permalink: "posts/".to_string(),
+                published_date: "2023-07-20".to_string(),
+            },
+            PostMeta {
+                title: "Post 3".to_string(),
+                excerpt: "asdas".to_string(),
+                permalink: "posts/".to_string(),
+                published_date: "2023-07-20".to_string(),
+            },
+        ]),
         pagenation,
     };
 
