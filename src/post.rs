@@ -41,8 +41,18 @@ pub enum ParseError {
 }
 
 impl Post {
-    pub fn from_md_string(md_string: &str) -> Result<Post, ParseError> {
-        let md_ast = to_mdast(md_string, &ParseOptions::gfm())
+    pub fn from_file(path: &PathBuf) -> Result<Post, ParseError> {
+        let md_string = std::fs::read_to_string(path).map_err(|err| {
+            if err.kind() == io::ErrorKind::NotFound {
+                ParseError::NotFound {
+                    file: path.to_string_lossy().to_string(),
+                }
+            } else {
+                err.into()
+            }
+        })?;
+
+        let md_ast = to_mdast(&md_string, &ParseOptions::gfm())
             .map_err(|err| MarkdownError::ErrorParsing { wrapped: err })?;
 
         let root = match &md_ast {
@@ -66,19 +76,5 @@ impl Post {
             content,
             toc: toc_html,
         })
-    }
-
-    pub fn from_file(path: &PathBuf) -> Result<Post, ParseError> {
-        let string = std::fs::read_to_string(path).map_err(|err| {
-            if err.kind() == io::ErrorKind::NotFound {
-                ParseError::NotFound {
-                    file: path.to_string_lossy().to_string(),
-                }
-            } else {
-                err.into()
-            }
-        })?;
-
-        Post::from_md_string(&string)
     }
 }
