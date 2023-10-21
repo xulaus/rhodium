@@ -6,7 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
 use ramhorns::Template;
 
-use crate::post::{ParseError, Post};
+use crate::post::{ParseError, Post, PostMeta};
 
 impl From<ParseError> for Response<String> {
     fn from(value: ParseError) -> Self {
@@ -44,8 +44,8 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
         Err(err) => return err.into(),
     };
 
-    let html: std::ffi::OsString = std::ffi::OsString::from("html");
-    let md: std::ffi::OsString = std::ffi::OsString::from("md");
+    let html = std::ffi::OsString::from("html");
+    let md = std::ffi::OsString::from("md");
     let md_file = {
         let mut md_file = std::path::Path::new(&state.site_root).join(uri_path);
 
@@ -69,13 +69,6 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
 
 use ramhorns::Content;
 #[derive(Content, Debug)]
-pub struct PostMeta {
-    permalink: String,
-    title: String,
-    published_date: String,
-    excerpt: String,
-}
-#[derive(Content, Debug)]
 pub struct Pagenation {
     first_page: Option<String>,
     previous_page: Option<String>,
@@ -96,37 +89,43 @@ fn render_index(state: &State, uri_path: &str) -> Response<String> {
         Err(err) => return err.into(),
     };
 
+    fn files_within(path: &PathBuf, acc: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
+        let md = std::ffi::OsString::from("md");
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            let metadata = entry.metadata()?;
+            let path = entry.path();
+            if metadata.is_file() && path.extension() == Some(&md) {
+                acc.push(path);
+            } else if metadata.is_dir() {
+                files_within(&path, acc)?;
+            }
+        }
+        Ok(())
+    }
+
+    let posts = {
+        let mut posts = vec![];
+        let mut path = state.site_root.clone();
+        path.push("posts/");
+        files_within(&path, &mut posts).expect("Failed to find files");
+        posts
+    };
     let pagenation = Pagenation {
         first_page: Some("index.html".to_owned()),
         previous_page: None,
         next_page: None,
         latest_page: Some("index.html".to_owned()),
         page: 1,
-        total_pages: 1,
+        total_pages: posts.len() as u32 / 20,
     };
-    let content = Index {
-        posts: Vec::from([
-            PostMeta {
-                title: "Post 1".to_string(),
-                excerpt: "asdas".to_string(),
-                permalink: "posts/".to_string(),
-                published_date: "2023-07-20".to_string(),
-            },
-            PostMeta {
-                title: "Post 2".to_string(),
-                excerpt: "asdas".to_string(),
-                permalink: "posts/".to_string(),
-                published_date: "2023-07-20".to_string(),
-            },
-            PostMeta {
-                title: "Post 3".to_string(),
-                excerpt: "asdas".to_string(),
-                permalink: "posts/".to_string(),
-                published_date: "2023-07-20".to_string(),
-            },
-        ]),
-        pagenation,
-    };
+
+    let posts = posts
+        .iter()
+        .filter_map(|path| Post::from_file(path).ok())
+        .map(|p| p.metadata)
+        .collect();
+    let content = Index { posts, pagenation };
 
     render_template_to_string(&template, &content)
         .and_then(|page| {

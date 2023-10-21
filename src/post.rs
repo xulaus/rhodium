@@ -6,8 +6,16 @@ use ramhorns::Content;
 use thiserror::Error;
 
 #[derive(Content, Debug)]
-pub struct Post {
+pub struct PostMeta {
+    pub permalink: String,
     pub title: String,
+    pub published_date: String,
+    pub excerpt: String,
+}
+
+#[derive(Content, Debug)]
+pub struct Post {
+    pub metadata: PostMeta,
     pub toc: Option<String>,
     pub content: String,
 }
@@ -42,6 +50,10 @@ pub enum ParseError {
 
 impl Post {
     pub fn from_file(path: &PathBuf) -> Result<Post, ParseError> {
+        let filename = path
+            .file_name()
+            .and_then(|x| x.to_str())
+            .map_or("".to_string(), |x| x.to_string());
         let md_string = std::fs::read_to_string(path).map_err(|err| {
             if err.kind() == io::ErrorKind::NotFound {
                 ParseError::NotFound {
@@ -71,8 +83,14 @@ impl Post {
         };
 
         let toc_html = toc.to_html();
-        Ok(Post {
+        let metadata = PostMeta {
             title: toc.name,
+            permalink: "".to_string(),
+            published_date: filename[0..10].to_string(),
+            excerpt: "".to_string(),
+        };
+        Ok(Post {
+            metadata,
             content,
             toc: toc_html,
         })
