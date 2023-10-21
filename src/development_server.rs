@@ -56,7 +56,7 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
         md_file
     };
 
-    Post::from_file(&md_file)
+    Post::from_file(&state.site_root, &md_file)
         .and_then(|post| render_template_to_string(&template, &post))
         .and_then(|page| {
             Response::builder()
@@ -117,12 +117,12 @@ fn render_index(state: &State, uri_path: &str) -> Response<String> {
         next_page: None,
         latest_page: Some("index.html".to_owned()),
         page: 1,
-        total_pages: posts.len() as u32 / 20,
+        total_pages: posts.len() as u32 / 20 + 1,
     };
 
     let posts = posts
         .iter()
-        .filter_map(|path| Post::from_file(path).ok())
+        .filter_map(|path| Post::from_file(&state.site_root, path).ok())
         .map(|p| p.metadata)
         .collect();
     let content = Index { posts, pagenation };

@@ -49,7 +49,7 @@ pub enum ParseError {
 }
 
 impl Post {
-    pub fn from_file(path: &PathBuf) -> Result<Post, ParseError> {
+    pub fn from_file(site_root: &PathBuf, path: &PathBuf) -> Result<Post, ParseError> {
         let filename = path
             .file_name()
             .and_then(|x| x.to_str())
@@ -82,10 +82,15 @@ impl Post {
             builder.concat()
         };
 
+        let new_path = {
+            let mut new_path = path.clone();
+            new_path.set_extension("html");
+            new_path.strip_prefix(site_root).unwrap().to_string_lossy().to_string()
+        };
         let toc_html = toc.to_html();
         let metadata = PostMeta {
             title: toc.name,
-            permalink: "".to_string(),
+            permalink: new_path,
             published_date: filename[0..10].to_string(),
             excerpt: "".to_string(),
         };

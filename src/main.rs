@@ -32,7 +32,7 @@ async fn main() -> color_eyre::eyre::Result<()> {
             template: path,
         } => {
             let template = Template::new(std::fs::read_to_string(path)?)?;
-            let post = Post::from_file(&md_file);
+            let post = Post::from_file(&std::path::PathBuf::from("/"), &md_file);
             template.render_to_writer(&mut std::io::stdout(), &post)?;
             Ok(())
         }
