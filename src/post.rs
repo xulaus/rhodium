@@ -85,7 +85,11 @@ impl Post {
         let new_path = {
             let mut new_path = path.clone();
             new_path.set_extension("html");
-            new_path.strip_prefix(site_root).unwrap().to_string_lossy().to_string()
+            new_path
+                .strip_prefix(site_root)
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
         };
         let toc_html = toc.to_html();
         let metadata = PostMeta {

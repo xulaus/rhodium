@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::ffi::OsStr;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -44,13 +45,11 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
         Err(err) => return err.into(),
     };
 
-    let html = std::ffi::OsString::from("html");
-    let md = std::ffi::OsString::from("md");
     let md_file = {
         let mut md_file = std::path::Path::new(&state.site_root).join(uri_path);
 
-        if md_file.extension() == Some(&html) {
-            md_file.set_extension(md);
+        if md_file.extension().and_then(OsStr::to_str) == Some("html") {
+            md_file.set_extension("md");
         }
 
         md_file
@@ -83,19 +82,19 @@ pub struct Index {
     pagenation: Pagenation,
 }
 
-fn render_index(state: &State, uri_path: &str) -> Response<String> {
+fn render_index(state: &State, _uri_path: &str) -> Response<String> {
     let template = match template_from_path(&state.index_template) {
         Ok(template) => template,
         Err(err) => return err.into(),
     };
 
     fn files_within(path: &PathBuf, acc: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
-        let md = std::ffi::OsString::from("md");
         for entry in std::fs::read_dir(path)? {
             let entry = entry?;
             let metadata = entry.metadata()?;
             let path = entry.path();
-            if metadata.is_file() && path.extension() == Some(&md) {
+
+            if metadata.is_file() && path.extension().and_then(OsStr::to_str) == Some("md") {
                 acc.push(path);
             } else if metadata.is_dir() {
                 files_within(&path, acc)?;
