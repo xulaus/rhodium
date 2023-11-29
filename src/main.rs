@@ -7,6 +7,7 @@ use post::Post;
 use ramhorns::Template;
 
 mod development_server;
+mod index;
 mod post;
 mod render;
 mod utils;

@@ -5,9 +5,10 @@ use std::path::PathBuf;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
-use ramhorns::Template;
+use ramhorns::{Content, Template};
 
-use crate::post::{ParseError, Post, PostMeta};
+use crate::index::Index;
+use crate::post::{ParseError, Post};
 
 impl From<ParseError> for Response<String> {
     fn from(value: ParseError) -> Self {
@@ -66,74 +67,37 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
         .unwrap_or_else(Into::into)
 }
 
-use ramhorns::Content;
-#[derive(Content, Debug)]
-pub struct Pagenation {
-    first_page: Option<String>,
-    previous_page: Option<String>,
-    next_page: Option<String>,
-    latest_page: Option<String>,
-    page: u32,
-    total_pages: u32,
-}
-#[derive(Content, Debug)]
-pub struct Index {
-    posts: Vec<PostMeta>,
-    pagenation: Pagenation,
-}
-
-fn render_index(state: &State, _uri_path: &str) -> Response<String> {
+fn render_index(state: &State) -> Response<String> {
     let template = match template_from_path(&state.index_template) {
         Ok(template) => template,
         Err(err) => return err.into(),
     };
 
-    fn files_within(path: &PathBuf, acc: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
-        for entry in std::fs::read_dir(path)? {
-            let entry = entry?;
-            let metadata = entry.metadata()?;
-            let path = entry.path();
-
-            if metadata.is_file() && path.extension().and_then(OsStr::to_str) == Some("md") {
-                acc.push(path);
-            } else if metadata.is_dir() {
-                files_within(&path, acc)?;
-            }
-        }
-        Ok(())
-    }
-
-    let posts = {
-        let mut posts = vec![];
+    let posts_root = {
         let mut path = state.site_root.clone();
         path.push("posts/");
-        files_within(&path, &mut posts).expect("Failed to find files");
-        posts
+        path
     };
-    let pagenation = Pagenation {
-        first_page: Some("index.html".to_owned()),
-        previous_page: None,
-        next_page: None,
-        latest_page: Some("index.html".to_owned()),
-        page: 1,
-        total_pages: posts.len() as u32 / 20 + 1,
-    };
+    let content = Index::from_path(&posts_root);
 
-    let posts = posts
-        .iter()
-        .filter_map(|path| Post::from_file(&state.site_root, path).ok())
-        .map(|p| p.metadata)
-        .collect();
-    let content = Index { posts, pagenation };
-
-    render_template_to_string(&template, &content)
-        .and_then(|page| {
-            Response::builder()
-                .status(hyper::StatusCode::OK)
-                .body(page)
-                .map_err(|_| ParseError::InternalError)
-        })
-        .unwrap_or_else(Into::into)
+    match content {
+        Err(err) => Response::builder()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .body(format!(
+                "Error gathering posts for index from \"{}\": {}",
+                posts_root.to_string_lossy(),
+                err
+            ))
+            .unwrap_or_else(|_| ParseError::InternalError.into()),
+        Ok(content) => render_template_to_string(&template, &content)
+            .and_then(|page| {
+                Response::builder()
+                    .status(hyper::StatusCode::OK)
+                    .body(page)
+                    .map_err(|_| ParseError::InternalError)
+            })
+            .unwrap_or_else(Into::into),
+    }
 }
 
 async fn build_for_web<'a>(req: Request<Body>, state: &State) -> Response<String> {
@@ -147,7 +111,7 @@ async fn build_for_web<'a>(req: Request<Body>, state: &State) -> Response<String
     let uri_path = &req.uri().path()[1..];
 
     if uri_path.is_empty() || uri_path == "index.html" {
-        render_index(state, uri_path)
+        render_index(state)
     } else {
         render_page(state, uri_path)
     }
@@ -161,8 +125,8 @@ async fn shutdown_signal() {
 
 pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper::Error> {
     let state = {
-        let page_template = std::path::Path::new(&site_root).join("page.hbs");
-        let index_template = std::path::Path::new(&site_root).join("index.hbs");
+        let page_template = std::path::Path::new(&site_root).join("_layouts/page.hbs");
+        let index_template = std::path::Path::new(&site_root).join("_layouts/index.hbs");
         std::sync::Arc::new(State {
             site_root,
             page_template,
