@@ -53,7 +53,11 @@ pub enum ParseError {
 }
 
 impl Post {
-    pub fn from_file(site_root: &Path, path: &Path, syntax_set: &SyntaxSet) -> Result<Post, ParseError> {
+    pub fn from_file(
+        site_root: &Path,
+        path: &Path,
+        syntax_set: &SyntaxSet,
+    ) -> Result<Post, ParseError> {
         let filename = path
             .file_name()
             .and_then(|x| x.to_str())

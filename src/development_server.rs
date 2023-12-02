@@ -101,7 +101,7 @@ fn render_index(state: &State) -> Response<String> {
     }
 }
 
-async fn build_for_web<'a> (req: Request<Body>, state: &State) -> Response<String> {
+async fn build_for_web<'a>(req: Request<Body>, state: &State) -> Response<String> {
     if req.method() != Method::GET {
         return Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
@@ -124,7 +124,10 @@ async fn shutdown_signal() {
         .expect("failed to install CTRL+C signal handler");
 }
 
-pub async fn serve_forever(site_root: PathBuf, syntax_set: SyntaxSet) -> std::result::Result<(), hyper::Error> {
+pub async fn serve_forever(
+    site_root: PathBuf,
+    syntax_set: SyntaxSet,
+) -> std::result::Result<(), hyper::Error> {
     let state = {
         let page_template = std::path::Path::new(&site_root).join("_config/layouts/post.hbs");
         let index_template = std::path::Path::new(&site_root).join("_config/layouts/index.hbs");
@@ -132,7 +135,7 @@ pub async fn serve_forever(site_root: PathBuf, syntax_set: SyntaxSet) -> std::re
             site_root,
             page_template,
             index_template,
-            syntax_set
+            syntax_set,
         })
     };
 
@@ -159,5 +162,5 @@ struct State {
     site_root: PathBuf,
     page_template: PathBuf,
     index_template: PathBuf,
-    syntax_set: SyntaxSet
+    syntax_set: SyntaxSet,
 }

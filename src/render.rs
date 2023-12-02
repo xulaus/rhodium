@@ -36,7 +36,7 @@ fn highlight_fragment(s: &str, lang: &str, syntax_set: &SyntaxSet) -> Result<Str
             lang: lang.to_owned(),
         })?;
 
-    highlighted_html_for_string(s, &syntax_set, syntax, &THEME).map_err(|e| e.into())
+    highlighted_html_for_string(s, syntax_set, syntax, &THEME).map_err(|e| e.into())
 }
 
 #[derive(Error, Debug)]
@@ -134,7 +134,7 @@ const HEADINGS: [&str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 pub fn mdast_into_str_builder<'a>(
     node: &'a mdast::Node,
     builder: &mut Vec<std::borrow::Cow<'a, str>>,
-    syntax_set: &SyntaxSet
+    syntax_set: &SyntaxSet,
 ) -> Result<(), RenderError> {
     match node {
         Node::Root(Root { children, .. }) => {

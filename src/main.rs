@@ -1,14 +1,11 @@
-#![feature(if_let_guard)]
-#![feature(let_chains)]
 #![feature(pattern)]
-#![feature(async_closure)]
 
 use clap::Parser;
 use index::Index;
 use post::Post;
 use ramhorns::Template;
+use std::path::{Path, PathBuf};
 use syntect::parsing::SyntaxSet;
-use std::path::{PathBuf, Path};
 
 mod development_server;
 mod index;
@@ -21,7 +18,7 @@ enum Args {
     Build {
         #[arg(long)]
         site_root: Option<PathBuf>,
-        #[arg(long, default_value="_site")]
+        #[arg(long, default_value = "_site")]
         build_dir: PathBuf,
     },
     Serve {
@@ -37,8 +34,9 @@ fn load_syntax_set(site_root: &Path) -> color_eyre::eyre::Result<SyntaxSet> {
     let syntax_folder = site_root.join("_config/syntaxes");
 
     if let Ok(folder) = std::fs::read_dir(syntax_folder) {
-        for file in folder {
-            if let Ok(file) = file && file.path().extension().and_then(std::ffi::OsStr::to_str) == Some("sublime-syntax") {
+        for file in folder.flatten() {
+            let path = file.path();
+            if path.extension().and_then(std::ffi::OsStr::to_str) == Some("sublime-syntax") {
                 let path = file.path();
                 println!("Loading {path:?}...");
                 let file_content = std::fs::read_to_string(path)?;
@@ -96,8 +94,10 @@ async fn main() -> color_eyre::eyre::Result<()> {
                 let index_path = build_dir.join("index.html");
                 std::io::BufWriter::new(std::fs::File::create(index_path)?)
             };
-            index_template
-                .render_to_writer(&mut out_file, &Index::from_file_list(&site_root, &all_site, &syntax_set))?;
+            index_template.render_to_writer(
+                &mut out_file,
+                &Index::from_file_list(&site_root, &all_site, &syntax_set),
+            )?;
 
             Ok(())
         }

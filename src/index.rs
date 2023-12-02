@@ -1,8 +1,8 @@
 use crate::post::{Post, PostMeta};
 use crate::utils::files_within;
 use ramhorns::Content;
-use syntect::parsing::SyntaxSet;
 use std::path::{Path, PathBuf};
+use syntect::parsing::SyntaxSet;
 
 #[derive(Content, Debug)]
 pub struct Pagenation {
@@ -42,6 +42,10 @@ impl Index {
         Index { posts, pagenation }
     }
     pub fn from_path(folder: &Path, syntax_set: &SyntaxSet) -> Result<Index, std::io::Error> {
-        Ok(Index::from_file_list(folder, &files_within(folder)?, syntax_set))
+        Ok(Index::from_file_list(
+            folder,
+            &files_within(folder)?,
+            syntax_set,
+        ))
     }
 }
