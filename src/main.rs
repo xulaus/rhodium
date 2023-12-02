@@ -16,8 +16,9 @@ mod utils;
 #[derive(Parser)]
 enum Args {
     Build {
-        site_root: std::path::PathBuf,
         #[arg(long)]
+        site_root: Option<std::path::PathBuf>,
+        #[arg(long, default_value="_site")]
         build_dir: std::path::PathBuf,
     },
     Serve {
@@ -34,6 +35,7 @@ async fn main() -> color_eyre::eyre::Result<()> {
             site_root,
             build_dir,
         } => {
+            let site_root = site_root.unwrap_or(".".into());
             let post_template = {
                 let template_path = site_root.join("_layouts/post.hbs");
                 let template_source =
