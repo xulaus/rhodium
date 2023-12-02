@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 struct NonAlphaNumRunSearcher<'a> {
     haystack: &'a str,
     cur: usize,
@@ -39,4 +41,29 @@ impl<'a> std::str::pattern::Pattern<'a> for NonAlphaNumRun {
 
 pub fn parameterize(s: &str) -> String {
     s.replace(NonAlphaNumRun {}, "-").to_lowercase()
+}
+
+pub fn files_within(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    let mut acc = vec![];
+
+    fn inner(root: &Path, branch: &Path, acc: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
+        for entry in std::fs::read_dir(root.join(branch))? {
+            let entry = entry?;
+            let metadata = entry.metadata()?;
+            let file_name = entry.file_name();
+            let path = PathBuf::from(&file_name);
+
+            if metadata.is_file()
+                && path.extension().and_then(std::ffi::OsStr::to_str) == Some("md")
+            {
+                acc.push(branch.join(file_name));
+            } else if metadata.is_dir() {
+                inner(root, &branch.join(file_name), acc)?;
+            }
+        }
+        Ok(())
+    }
+
+    inner(path, &PathBuf::new(), &mut acc)?;
+    Ok(acc)
 }

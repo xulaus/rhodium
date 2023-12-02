@@ -1,7 +1,7 @@
 use crate::post::{Post, PostMeta};
+use crate::utils::files_within;
 use ramhorns::Content;
-use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Content, Debug)]
 pub struct Pagenation {
@@ -19,24 +19,7 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn from_path(folder: &PathBuf) -> Result<Index, std::io::Error> {
-        fn files_within(path: &PathBuf) -> Result<Vec<PathBuf>, std::io::Error> {
-            let mut acc = vec![];
-            for entry in std::fs::read_dir(path)? {
-                let entry = entry?;
-                let metadata = entry.metadata()?;
-                let path = entry.path();
-
-                if metadata.is_file() && path.extension().and_then(OsStr::to_str) == Some("md") {
-                    acc.push(path);
-                } else if metadata.is_dir() {
-                    acc.extend(files_within(&path)?);
-                }
-            }
-            Ok(acc)
-        }
-
-        let posts = files_within(folder)?;
+    pub fn from_file_list(site_root: &Path, posts: &[PathBuf]) -> Index {
         let pagenation = if posts.len() > 20 {
             Some(Pagenation {
                 first_page: Some("index.html".to_owned()),
@@ -52,9 +35,12 @@ impl Index {
 
         let posts = posts
             .iter()
-            .filter_map(|path| Post::from_file(folder, path).ok())
+            .filter_map(|path| Post::from_file(site_root, path).ok())
             .map(|p| p.metadata)
             .collect();
-        Ok(Index { posts, pagenation })
+        Index { posts, pagenation }
+    }
+    pub fn from_path(folder: &Path) -> Result<Index, std::io::Error> {
+        Ok(Index::from_file_list(folder, &files_within(folder)?))
     }
 }

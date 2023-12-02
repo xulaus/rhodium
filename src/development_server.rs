@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::ffi::OsStr;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
@@ -25,7 +25,7 @@ impl From<ParseError> for Response<String> {
     }
 }
 
-fn template_from_path(path: &PathBuf) -> Result<Template, ParseError> {
+fn template_from_path(path: &Path) -> Result<Template, ParseError> {
     Ok(Template::new(std::fs::read_to_string(path)?)?)
 }
 
@@ -125,7 +125,7 @@ async fn shutdown_signal() {
 
 pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper::Error> {
     let state = {
-        let page_template = std::path::Path::new(&site_root).join("_layouts/page.hbs");
+        let page_template = std::path::Path::new(&site_root).join("_layouts/post.hbs");
         let index_template = std::path::Path::new(&site_root).join("_layouts/index.hbs");
         std::sync::Arc::new(State {
             site_root,

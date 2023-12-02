@@ -1,4 +1,7 @@
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use crate::render::{mdast_into_str_builder, MarkdownError, RenderError, Toc};
 use markdown::{mdast, to_mdast, ParseOptions};
@@ -49,12 +52,12 @@ pub enum ParseError {
 }
 
 impl Post {
-    pub fn from_file(site_root: &PathBuf, path: &PathBuf) -> Result<Post, ParseError> {
+    pub fn from_file(site_root: &Path, path: &Path) -> Result<Post, ParseError> {
         let filename = path
             .file_name()
             .and_then(|x| x.to_str())
             .map_or("".to_string(), |x| x.to_string());
-        let md_string = std::fs::read_to_string(path).map_err(|err| {
+        let md_string = std::fs::read_to_string(site_root.join(path)).map_err(|err| {
             if err.kind() == io::ErrorKind::NotFound {
                 ParseError::NotFound {
                     file: path.to_string_lossy().to_string(),
@@ -83,13 +86,9 @@ impl Post {
         };
 
         let new_path = {
-            let mut new_path = path.clone();
+            let mut new_path: PathBuf = path.into();
             new_path.set_extension("html");
-            new_path
-                .strip_prefix(site_root)
-                .unwrap()
-                .to_string_lossy()
-                .to_string()
+            new_path.to_string_lossy().to_string()
         };
         let toc_html = toc.to_html();
         let metadata = PostMeta {
