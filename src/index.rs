@@ -1,6 +1,7 @@
 use crate::post::{Post, PostMeta};
 use crate::utils::files_within;
 use ramhorns::Content;
+use syntect::parsing::SyntaxSet;
 use std::path::{Path, PathBuf};
 
 #[derive(Content, Debug)]
@@ -19,7 +20,7 @@ pub struct Index {
 }
 
 impl Index {
-    pub fn from_file_list(site_root: &Path, posts: &[PathBuf]) -> Index {
+    pub fn from_file_list(site_root: &Path, posts: &[PathBuf], syntax_set: &SyntaxSet) -> Index {
         let pagenation = if posts.len() > 20 {
             Some(Pagenation {
                 first_page: Some("index.html".to_owned()),
@@ -35,12 +36,12 @@ impl Index {
 
         let posts = posts
             .iter()
-            .filter_map(|path| Post::from_file(site_root, path).ok())
+            .filter_map(|path| Post::from_file(site_root, path, syntax_set).ok())
             .map(|p| p.metadata)
             .collect();
         Index { posts, pagenation }
     }
-    pub fn from_path(folder: &Path) -> Result<Index, std::io::Error> {
-        Ok(Index::from_file_list(folder, &files_within(folder)?))
+    pub fn from_path(folder: &Path, syntax_set: &SyntaxSet) -> Result<Index, std::io::Error> {
+        Ok(Index::from_file_list(folder, &files_within(folder)?, syntax_set))
     }
 }

@@ -6,6 +6,7 @@ use std::{
 use crate::render::{mdast_into_str_builder, MarkdownError, RenderError, Toc};
 use markdown::{mdast, to_mdast, ParseOptions};
 use ramhorns::Content;
+use syntect::parsing::SyntaxSet;
 use thiserror::Error;
 
 #[derive(Content, Debug)]
@@ -52,7 +53,7 @@ pub enum ParseError {
 }
 
 impl Post {
-    pub fn from_file(site_root: &Path, path: &Path) -> Result<Post, ParseError> {
+    pub fn from_file(site_root: &Path, path: &Path, syntax_set: &SyntaxSet) -> Result<Post, ParseError> {
         let filename = path
             .file_name()
             .and_then(|x| x.to_str())
@@ -81,7 +82,7 @@ impl Post {
         let toc = Toc::from_mdast(root)?;
         let content = {
             let mut builder = vec![];
-            mdast_into_str_builder(&md_ast, &mut builder)?;
+            mdast_into_str_builder(&md_ast, &mut builder, syntax_set)?;
             builder.concat()
         };
 

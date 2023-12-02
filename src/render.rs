@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 use markdown::{mdast, mdast::*};
 use std::borrow::Cow;
-use syntect::dumps;
 use syntect::highlighting::{Theme, ThemeSet};
 use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
@@ -24,24 +23,12 @@ pub enum RenderError {
 }
 
 lazy_static! {
-    static ref SYNTAX_SET: SyntaxSet = {
-        dumps::from_uncompressed_data::<SyntaxSet>(include_bytes!("syntax-set.dump")).expect("")
-    };
     static ref THEME_SET: ThemeSet = ThemeSet::load_defaults();
     static ref THEME: &'static Theme = &THEME_SET.themes["base16-ocean.dark"];
 }
 
-fn highlight_fragment(s: &str, lang: &str) -> Result<String, RenderError> {
-    // TODO: Move this logic to a build.rs
-    // use syntect::parsing::SyntaxDefinition;
-    // let mut ssb = SyntaxSet::load_defaults_newlines().into_builder();
-    // ssb.add(
-    //     SyntaxDefinition::load_from_str(include_str!("wast.sublime-syntax"), true, None).unwrap()
-    // );
-    // let ps = ssb.build();
-    // dumps::dump_to_uncompressed_file(&ps, "src/syntax-set.dump").unwrap();
-
-    let syntax = SYNTAX_SET
+fn highlight_fragment(s: &str, lang: &str, syntax_set: &SyntaxSet) -> Result<String, RenderError> {
+    let syntax = syntax_set
         .syntaxes()
         .iter()
         .find(|&s| s.name.eq_ignore_ascii_case(lang))
@@ -49,7 +36,7 @@ fn highlight_fragment(s: &str, lang: &str) -> Result<String, RenderError> {
             lang: lang.to_owned(),
         })?;
 
-    highlighted_html_for_string(s, &SYNTAX_SET, syntax, &THEME).map_err(|e| e.into())
+    highlighted_html_for_string(s, &syntax_set, syntax, &THEME).map_err(|e| e.into())
 }
 
 #[derive(Error, Debug)]
@@ -147,11 +134,12 @@ const HEADINGS: [&str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
 pub fn mdast_into_str_builder<'a>(
     node: &'a mdast::Node,
     builder: &mut Vec<std::borrow::Cow<'a, str>>,
+    syntax_set: &SyntaxSet
 ) -> Result<(), RenderError> {
     match node {
         Node::Root(Root { children, .. }) => {
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             Ok(())
         }
@@ -168,7 +156,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::Emphasis(Emphasis { children, .. }) => {
             builder.push(Cow::Borrowed("<em>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</em>"));
             Ok(())
@@ -176,7 +164,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::Strong(Strong { children, .. }) => {
             builder.push(Cow::Borrowed("<strong>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</strong>"));
             Ok(())
@@ -188,7 +176,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::Delete(Delete { children, .. }) => {
             builder.push(Cow::Borrowed("<del>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</del>"));
             Ok(())
@@ -207,14 +195,14 @@ pub fn mdast_into_str_builder<'a>(
             }
             builder.push(Cow::Borrowed("\">"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</a>"));
             Ok(())
         }
         Node::Code(Code { value, lang, .. }) => {
             if let Some(lang) = lang {
-                match highlight_fragment(value, lang) {
+                match highlight_fragment(value, lang, syntax_set) {
                     Ok(highlighted) => {
                         builder.push(Cow::Owned(highlighted));
                         return Ok(());
@@ -235,7 +223,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::Paragraph(Paragraph { children, .. }) => {
             builder.push(Cow::Borrowed("<p>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</p>"));
             Ok(())
@@ -243,7 +231,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::List(List { children, .. }) => {
             builder.push(Cow::Borrowed("<ol>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</ol>"));
             Ok(())
@@ -252,7 +240,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::BlockQuote(BlockQuote { children, .. }) => {
             builder.push(Cow::Borrowed("<blockquote>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</blockquote>"));
             Ok(())
@@ -275,7 +263,7 @@ pub fn mdast_into_str_builder<'a>(
                     }
                     if let Node::TableCell(TableCell { children: cell, .. }) = head {
                         for node in cell {
-                            mdast_into_str_builder(node, builder)?;
+                            mdast_into_str_builder(node, builder, syntax_set)?;
                         }
                     } else {
                         return Err(RenderError::InternalError);
@@ -301,7 +289,7 @@ pub fn mdast_into_str_builder<'a>(
                             }
                             if let Node::TableCell(TableCell { children: cell, .. }) = cell {
                                 for node in cell {
-                                    mdast_into_str_builder(node, builder)?;
+                                    mdast_into_str_builder(node, builder, syntax_set)?;
                                 }
                             } else {
                                 return Err(RenderError::InternalError);
@@ -324,7 +312,7 @@ pub fn mdast_into_str_builder<'a>(
         Node::ListItem(ListItem { children, .. }) => {
             builder.push(Cow::Borrowed("<li>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</li>"));
             Ok(())
@@ -341,7 +329,7 @@ pub fn mdast_into_str_builder<'a>(
             builder.push(Cow::Owned(parameterize(&node.to_string())));
             builder.push(Cow::Borrowed("\">"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</"));
             builder.push(Cow::Borrowed(heading));
@@ -380,7 +368,7 @@ pub fn mdast_into_str_builder<'a>(
             builder.push(Cow::Borrowed(label.as_ref().unwrap_or(identifier)));
             builder.push(Cow::Borrowed("</div>"));
             for child in children {
-                mdast_into_str_builder(child, builder)?;
+                mdast_into_str_builder(child, builder, syntax_set)?;
             }
             builder.push(Cow::Borrowed("</div>"));
             Ok(())

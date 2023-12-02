@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
 use ramhorns::{Content, Template};
+use syntect::parsing::SyntaxSet;
 
 use crate::index::Index;
 use crate::post::{ParseError, Post};
@@ -56,7 +57,7 @@ fn render_page(state: &State, uri_path: &str) -> Response<String> {
         md_file
     };
 
-    Post::from_file(&state.site_root, &md_file)
+    Post::from_file(&state.site_root, &md_file, &state.syntax_set)
         .and_then(|post| render_template_to_string(&template, &post))
         .and_then(|page| {
             Response::builder()
@@ -78,7 +79,7 @@ fn render_index(state: &State) -> Response<String> {
         path.push("posts/");
         path
     };
-    let content = Index::from_path(&posts_root);
+    let content = Index::from_path(&posts_root, &state.syntax_set);
 
     match content {
         Err(err) => Response::builder()
@@ -100,7 +101,7 @@ fn render_index(state: &State) -> Response<String> {
     }
 }
 
-async fn build_for_web<'a>(req: Request<Body>, state: &State) -> Response<String> {
+async fn build_for_web<'a> (req: Request<Body>, state: &State) -> Response<String> {
     if req.method() != Method::GET {
         return Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
@@ -123,14 +124,15 @@ async fn shutdown_signal() {
         .expect("failed to install CTRL+C signal handler");
 }
 
-pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper::Error> {
+pub async fn serve_forever(site_root: PathBuf, syntax_set: SyntaxSet) -> std::result::Result<(), hyper::Error> {
     let state = {
-        let page_template = std::path::Path::new(&site_root).join("_layouts/post.hbs");
-        let index_template = std::path::Path::new(&site_root).join("_layouts/index.hbs");
+        let page_template = std::path::Path::new(&site_root).join("_config/layouts/post.hbs");
+        let index_template = std::path::Path::new(&site_root).join("_config/layouts/index.hbs");
         std::sync::Arc::new(State {
             site_root,
             page_template,
             index_template,
+            syntax_set
         })
     };
 
@@ -149,6 +151,7 @@ pub async fn serve_forever(site_root: PathBuf) -> std::result::Result<(), hyper:
         .serve(make_service)
         .with_graceful_shutdown(shutdown_signal());
 
+    println!("Serving on 127.0.0.1:1024");
     server.await
 }
 
@@ -156,4 +159,5 @@ struct State {
     site_root: PathBuf,
     page_template: PathBuf,
     index_template: PathBuf,
+    syntax_set: SyntaxSet
 }
