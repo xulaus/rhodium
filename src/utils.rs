@@ -1,46 +1,24 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, borrow::Cow};
+pub fn parameterize(s: &str) -> Cow<str> {
+    let mut char_iter = s.chars().enumerate();
+    if let Some((i, _)) = char_iter.find(|(_i, x)| !x.is_alphanumeric()) {
+        let mut out = String::with_capacity(s.len());
+        out += &s[0..i];
 
-struct NonAlphaNumRunSearcher<'a> {
-    haystack: &'a str,
-    cur: usize,
-}
-unsafe impl<'a> std::str::pattern::Searcher<'a> for NonAlphaNumRunSearcher<'a> {
-    fn haystack(&self) -> &'a str {
-        self.haystack
-    }
-    fn next(&mut self) -> std::str::pattern::SearchStep {
-        use std::str::pattern::SearchStep;
-        let mut rest = self.haystack.chars().enumerate().skip(self.cur);
-        if let Some((begin, first)) = rest.next() {
-            if first.is_alphanumeric() {
-                (self.cur, _) = rest
-                    .find(|(_i, x)| !x.is_alphanumeric())
-                    .unwrap_or((self.haystack.len(), ' '));
-                SearchStep::Reject(begin, self.cur)
+        while let Some((start, _)) = char_iter.find(|(_i, x)| x.is_alphanumeric()) {
+            out += "-";
+            if let Some((end, _)) = char_iter.find(|(_i, x)| !x.is_alphanumeric()) {
+                out += &s[start..end];
             } else {
-                (self.cur, _) = rest
-                    .find(|(_i, x)| x.is_alphanumeric())
-                    .unwrap_or((self.haystack.len(), ' '));
-                SearchStep::Match(begin, self.cur)
+                out += &s[start..];
+                break;
             }
-        } else {
-            SearchStep::Done
         }
+
+        Cow::Owned(out)
+    } else {
+        Cow::Borrowed(s)
     }
-}
-
-struct NonAlphaNumRun {}
-
-impl<'a> std::str::pattern::Pattern<'a> for NonAlphaNumRun {
-    type Searcher = NonAlphaNumRunSearcher<'a>;
-
-    fn into_searcher(self, haystack: &'a str) -> Self::Searcher {
-        NonAlphaNumRunSearcher::<'a> { haystack, cur: 0 }
-    }
-}
-
-pub fn parameterize(s: &str) -> String {
-    s.replace(NonAlphaNumRun {}, "-").to_lowercase()
 }
 
 pub fn files_within(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
@@ -66,4 +44,17 @@ pub fn files_within(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
 
     inner(path, &PathBuf::new(), &mut acc)?;
     Ok(acc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parameterize() {
+        assert_eq!(parameterize("foo"), Cow::Borrowed("foo"));
+        assert_eq!(parameterize("foo!!bar"), Cow::<str>::Owned("foo-bar".into()));
+        assert_eq!(parameterize("foo!!bar!baz"), Cow::<str>::Owned("foo-bar-baz".into()));
+        assert_eq!(parameterize("foo!!bar!baz:"), Cow::<str>::Owned("foo-bar-baz".into()));
+    }
 }

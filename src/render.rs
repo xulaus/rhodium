@@ -77,7 +77,7 @@ impl Toc {
         builder.push(Cow::Borrowed("<ol>"));
         for child in &self.children {
             builder.push(Cow::Borrowed("<li><a href=\"#"));
-            builder.push(Cow::Owned(parameterize(&child.name)));
+            builder.push(parameterize(&child.name));
             builder.push(Cow::Borrowed("\">"));
             builder.push(Cow::Borrowed(&child.name));
             builder.push(Cow::Borrowed("</a></li>"));
@@ -323,10 +323,11 @@ pub fn mdast_into_str_builder<'a>(
             let heading = HEADINGS
                 .get((*depth - 1) as usize)
                 .ok_or(RenderError::HeaderTooDeep)?;
+            let name = node.to_string();
             builder.push(Cow::Borrowed("<"));
             builder.push(Cow::Borrowed(heading));
             builder.push(Cow::Borrowed(" id=\""));
-            builder.push(Cow::Owned(parameterize(&node.to_string())));
+            builder.push(Cow::Owned(parameterize(&name).into_owned()));
             builder.push(Cow::Borrowed("\">"));
             for child in children {
                 mdast_into_str_builder(child, builder, syntax_set)?;
@@ -345,7 +346,7 @@ pub fn mdast_into_str_builder<'a>(
         }) => {
             if let Some(label) = label {
                 builder.push(Cow::Borrowed("<sup><a href=\"#"));
-                builder.push(Cow::Owned(parameterize(label)));
+                builder.push(parameterize(label));
                 builder.push(Cow::Borrowed("\">"));
                 builder.push(Cow::Borrowed(identifier));
                 builder.push(Cow::Borrowed("</a></sup>"));

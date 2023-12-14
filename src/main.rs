@@ -1,5 +1,3 @@
-#![feature(pattern)]
-
 use clap::Parser;
 use index::Index;
 use post::Post;
