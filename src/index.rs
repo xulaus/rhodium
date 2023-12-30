@@ -36,7 +36,7 @@ impl Index {
             None
         };
 
-        let posts = posts
+        let mut posts: Vec<_> = posts
             .iter()
             .filter_map(|path| match Post::from_file(site_root, path, syntax_set) {
                 Ok(p) => Some(p.metadata),
@@ -46,6 +46,8 @@ impl Index {
                 }
             })
             .collect();
+        posts.sort_by_key(|p| p.published_date.clone());
+        posts.reverse();
         Index { posts, pagenation }
     }
     pub fn from_path(folder: &Path, syntax_set: &SyntaxSet) -> Result<Index, std::io::Error> {
