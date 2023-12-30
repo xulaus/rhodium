@@ -75,19 +75,14 @@ fn render_index(state: &State) -> Response<String> {
         Err(err) => return err.into(),
     };
 
-    let posts_root = {
-        let mut path = state.site_root.clone();
-        path.push("posts/");
-        path
-    };
-    let content = Index::from_path(&posts_root, &state.syntax_set);
+    let content = Index::from_path(&state.site_root, &state.syntax_set);
 
     match content {
         Err(err) => Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body(format!(
                 "Error gathering posts for index from \"{}\": {}",
-                posts_root.to_string_lossy(),
+                state.site_root.to_string_lossy(),
                 err
             ))
             .unwrap_or_else(|_| ParseError::InternalError.into()),
