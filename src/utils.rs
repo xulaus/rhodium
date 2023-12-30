@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, borrow::Cow};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 pub fn parameterize(s: &str) -> Cow<str> {
     let mut char_iter = s.chars().enumerate();
     if let Some((i, _)) = char_iter.find(|(_i, x)| !x.is_alphanumeric()) {
@@ -53,8 +56,17 @@ mod tests {
     #[test]
     fn test_parameterize() {
         assert_eq!(parameterize("foo"), Cow::Borrowed("foo"));
-        assert_eq!(parameterize("foo!!bar"), Cow::<str>::Owned("foo-bar".into()));
-        assert_eq!(parameterize("foo!!bar!baz"), Cow::<str>::Owned("foo-bar-baz".into()));
-        assert_eq!(parameterize("foo!!bar!baz:"), Cow::<str>::Owned("foo-bar-baz".into()));
+        assert_eq!(
+            parameterize("foo!!bar"),
+            Cow::<str>::Owned("foo-bar".into())
+        );
+        assert_eq!(
+            parameterize("foo!!bar!baz"),
+            Cow::<str>::Owned("foo-bar-baz".into())
+        );
+        assert_eq!(
+            parameterize("foo!!bar!baz:"),
+            Cow::<str>::Owned("foo-bar-baz".into())
+        );
     }
 }

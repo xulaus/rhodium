@@ -1,5 +1,6 @@
 use crate::post::{Post, PostMeta};
 use crate::utils::files_within;
+use log::error;
 use ramhorns::Content;
 use std::path::{Path, PathBuf};
 use syntect::parsing::SyntaxSet;
@@ -22,6 +23,7 @@ pub struct Index {
 impl Index {
     pub fn from_file_list(site_root: &Path, posts: &[PathBuf], syntax_set: &SyntaxSet) -> Index {
         let pagenation = if posts.len() > 20 {
+            error!("Need to paginate, but feature is not developed yet.");
             Some(Pagenation {
                 first_page: Some("index.html".to_owned()),
                 previous_page: None,
@@ -36,8 +38,13 @@ impl Index {
 
         let posts = posts
             .iter()
-            .filter_map(|path| Post::from_file(site_root, path, syntax_set).ok())
-            .map(|p| p.metadata)
+            .filter_map(|path| match Post::from_file(site_root, path, syntax_set) {
+                Ok(p) => Some(p.metadata),
+                Err(err) => {
+                    error!("Couldn't render page {}. {}", path.to_string_lossy(), err);
+                    None
+                }
+            })
             .collect();
         Index { posts, pagenation }
     }

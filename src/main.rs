@@ -1,5 +1,6 @@
 use clap::Parser;
 use index::Index;
+use log::{debug, info, Level, LevelFilter, Metadata, Record};
 use post::Post;
 use ramhorns::Template;
 use std::path::{Path, PathBuf};
@@ -10,6 +11,25 @@ mod index;
 mod post;
 mod render;
 mod utils;
+
+struct SimpleLogger;
+
+impl log::Log for SimpleLogger {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        let meta = record.metadata();
+        if meta.level() == Level::Info {
+            println!("{}", record.args());
+        } else {
+            println!("{} - {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
 
 #[derive(Parser)]
 enum Args {
@@ -26,7 +46,7 @@ enum Args {
 }
 
 fn load_syntax_set(site_root: &Path) -> color_eyre::eyre::Result<SyntaxSet> {
-    println!("Loading Syntax Set....");
+    info!("Loading Syntax Sets....");
     use syntect::parsing::SyntaxDefinition;
     let mut ssb = SyntaxSet::load_defaults_newlines().into_builder();
     let syntax_folder = site_root.join("_config/syntaxes");
@@ -36,7 +56,7 @@ fn load_syntax_set(site_root: &Path) -> color_eyre::eyre::Result<SyntaxSet> {
             let path = file.path();
             if path.extension().and_then(std::ffi::OsStr::to_str) == Some("sublime-syntax") {
                 let path = file.path();
-                println!("Loading {path:?}...");
+                debug!("Loading {path:?}...");
                 let file_content = std::fs::read_to_string(path)?;
                 let def = SyntaxDefinition::load_from_str(&file_content, true, None)?;
                 ssb.add(def);
@@ -44,13 +64,15 @@ fn load_syntax_set(site_root: &Path) -> color_eyre::eyre::Result<SyntaxSet> {
         }
     }
     let ps = ssb.build();
-    println!("Done");
     Ok(ps)
 }
 
 #[tokio::main]
 async fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
+    log::set_boxed_logger(Box::new(SimpleLogger))
+        .map(|()| log::set_max_level(LevelFilter::Info))
+        .expect("Unable to create logger");
 
     match Args::parse() {
         Args::Build {

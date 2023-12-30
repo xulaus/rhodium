@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
+use log::info;
 use ramhorns::{Content, Template};
 use syntect::parsing::SyntaxSet;
 
@@ -154,7 +155,7 @@ pub async fn serve_forever(
         .serve(make_service)
         .with_graceful_shutdown(shutdown_signal());
 
-    println!("Serving on 127.0.0.1:1024");
+    info!("Serving on 127.0.0.1:1024");
     server.await
 }
 
